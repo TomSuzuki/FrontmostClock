@@ -1,0 +1,124 @@
+#define global ctype hexRGB(%1,%2,%3) (%1 | %2 << 8 | %3 << 16)
+#define global ctype decRGB(%1) %1>>16 & 0xFF,%1>>8 & 0xFF,%1 & 0xFF
+
+#include "lib.hsp"
+
+#define global _title "最前面時計 version 1.00"
+
+#define global WM_SIZE		0x0005
+
+#define global clock_x	960
+#define global clock_y	256
+
+#define global font_family "マキナス"
+
+#uselib "user32.dll" 
+	#cfunc CreatePopupMenu "CreatePopupMenu"
+	#func InsertMenu "InsertMenuA" int,int,int,int,sptr
+	#func TrackPopupMenu "TrackPopupMenu" int,int,int,int,int,int,int
+	#func DestroyMenu "DestroyMenu" int
+	#func SetForegroundWindow "SetForegroundWindow" int
+	#func PostMessage "PostMessageA" int,int,int,int
+	#func SetTimer "SetTimer" int,int,int,sptr
+	#func KillTimer "KillTimer" int,int
+
+#define WM_RBUTTONDOWN	0x0204
+#define WM_COMMAND		0x0111	
+
+	weekday = "日","月","火","水","木","金","土"
+
+
+	buffer 1,clock_x,clock_y
+	ovbgscr 0,480,128
+	title "最前面時計"
+	gsel 0,2
+
+	oncmd gosub *Label_WindowCommand, WM_SIZE
+	onclick gosub *move
+	oncmd gosub *RBUTTONDOWN,WM_RBUTTONDOWN
+	oncmd gosub *COMMAND,WM_COMMAND
+
+	repeat
+		redraw 0
+
+		// 時計の描画
+		gosub *label_display
+
+		redraw 1
+		await 1000/30
+	loop
+
+//メニュー処理
+*COMMAND
+	switch wparam & 0xffff
+	case 0
+		dialog "(C) 2020 TomSuzuki. \n " + _title,0
+		swbreak
+	case 1
+		end
+		swbreak
+	swend
+	return
+
+*RBUTTONDOWN
+	gosub *menu
+	return
+
+//メニュー表示
+*menu
+	hPopupMenu=CreatePopupMenu()
+	InsertMenu hPopupMenu,4,0x400,0,"バージョン情報(&A)"
+	InsertMenu hPopupMenu,4,0x400,1,"終了(&Q)"
+	TrackPopupMenu hPopupMenu,0x20,ginfo(0),ginfo(1),0,hwnd,0
+	DestroyMenu hPopupMenu
+	return
+
+*move
+	cursel = ginfo_sel
+	gsel ginfo_act
+	sendmsg hwnd ,$a1,2,z
+	gsel cursel
+	return
+
+*label_display
+
+	gsel 1
+
+	color1 = 0xE5004F
+	color2 = 0xFFFAFA
+
+	padding = 4
+	
+	// 背景
+	color decRGB(color1):boxf
+	color decRGB(color2):boxf padding,padding,clock_x-padding-1,clock_y-padding-1
+	
+
+	// メインの時計
+	color decRGB(color1)
+	font font_family,164,1
+	pos clock_x/2,95
+	tmes strf("%02d:%02d:%02d",gettime(4),gettime(5),gettime(6))
+
+	// 日付
+	font font_family,48,1
+	pos clock_x/2,clock_y-44
+	tmes strf("%04d/%02d/%02d (%s)",gettime(0),gettime(1),gettime(3),weekday(gettime(2)))
+
+	// バー
+	boxf 32,170,clock_x-32,174
+	
+	// コピー
+	gsel 0
+	pos 0,0
+	gzoom ginfo(12),ginfo(13),1,0,0,clock_x,clock_y,0
+
+	return
+
+
+*Label_WindowCommand
+
+	gosub *label_display
+
+	return
+	
