@@ -1,17 +1,8 @@
+// マクロ定義
 #define global ctype hexRGB(%1,%2,%3) (%1 | %2 << 8 | %3 << 16)
 #define global ctype decRGB(%1) %1>>16 & 0xFF,%1>>8 & 0xFF,%1 & 0xFF
 
-#include "lib.hsp"
-
-#define global _title "最前面時計 version 1.00"
-
-#define global WM_SIZE		0x0005
-
-#define global clock_x	960
-#define global clock_y	256
-
-#define global font_family "マキナス"
-
+// 画面関連用
 #uselib "user32.dll" 
 	#cfunc CreatePopupMenu "CreatePopupMenu"
 	#func InsertMenu "InsertMenuA" int,int,int,int,sptr
@@ -22,22 +13,54 @@
 	#func SetTimer "SetTimer" int,int,int,sptr
 	#func KillTimer "KillTimer" int,int
 
-#define WM_RBUTTONDOWN	0x0204
-#define WM_COMMAND		0x0111	
+// ライブラリ読み込み
+#include "lib.hsp"
+#include "config.hsp"
 
+// バージョン情報
+#define global _title "最前面時計 version 1.10"
+
+// 画面サイズ（ここは変更しない）
+#define global clock_x	960
+#define global clock_y	256
+
+// WINAPI用の定義
+#define global WM_SIZE			0x0005
+#define global WM_RBUTTONDOWN	0x0204
+#define global WM_COMMAND		0x0111
+
+	// コンフィグから読み込み
+	notesel data
+	noteload "./config.cfg"
+	SetConfigData data
+		color1 = int(LoadConfig("color1","$E5004F"))
+		color2 = int(LoadConfig("color2","$FFFAFA"))
+		font_family = LoadConfig("font","マキナス")
+		window_rate = double(LoadConfig("windowRate","1"))
+
+	SaveConfig "./config.cfg"
+
+	// 調整
+	if(color1==0):color1 = 1
+	if(color2==0):color2 = 1
+
+	// 設定
 	weekday = "日","月","火","水","木","金","土"
+	padding = 4
 
-
+	// ウィンドウ定義
 	buffer 1,clock_x,clock_y
-	ovbgscr 0,480,128
+	ovbgscr 0,int(window_rate*clock_x),int(window_rate*clock_y)
 	title "最前面時計"
 	gsel 0,2
 
-	oncmd gosub *Label_WindowCommand, WM_SIZE
-	onclick gosub *move
-	oncmd gosub *RBUTTONDOWN,WM_RBUTTONDOWN
-	oncmd gosub *COMMAND,WM_COMMAND
+	// 割り込み定義
+	onclick gosub *label_move
+	oncmd gosub *label_windowCommand, WM_SIZE
+	oncmd gosub *label_showMenu,WM_RBUTTONDOWN
+	oncmd gosub *label_command,WM_COMMAND
 
+	// メインループ
 	repeat
 		redraw 0
 
@@ -49,7 +72,9 @@
 	loop
 
 //メニュー処理
-*COMMAND
+*label_command
+
+	// メニューの処理
 	switch wparam & 0xffff
 	case 0
 		dialog "(C) 2020 TomSuzuki. \n " + _title,0
@@ -58,41 +83,45 @@
 		end
 		swbreak
 	swend
+	
 	return
 
-*RBUTTONDOWN
-	gosub *menu
+*label_showMenu
+	
+	gosub *label_menu
+	
 	return
 
 //メニュー表示
-*menu
+*label_menu
+	
 	hPopupMenu=CreatePopupMenu()
 	InsertMenu hPopupMenu,4,0x400,0,"バージョン情報(&A)"
 	InsertMenu hPopupMenu,4,0x400,1,"終了(&Q)"
 	TrackPopupMenu hPopupMenu,0x20,ginfo(0),ginfo(1),0,hwnd,0
 	DestroyMenu hPopupMenu
+	
 	return
 
-*move
+// 移動用（これが無いとマウスで画面を移動できない）
+*label_move
+	
 	cursel = ginfo_sel
 	gsel ginfo_act
 	sendmsg hwnd ,$a1,2,z
 	gsel cursel
+	
 	return
 
+// 表示
 *label_display
 
+	// 画面切り替え
 	gsel 1
-
-	color1 = 0xE5004F
-	color2 = 0xFFFAFA
-
-	padding = 4
 	
 	// 背景
 	color decRGB(color1):boxf
 	color decRGB(color2):boxf padding,padding,clock_x-padding-1,clock_y-padding-1
-	
 
 	// メインの時計
 	color decRGB(color1)
@@ -115,8 +144,8 @@
 
 	return
 
-
-*Label_WindowCommand
+// 割り込みコマンド
+*label_windowCommand
 
 	gosub *label_display
 
