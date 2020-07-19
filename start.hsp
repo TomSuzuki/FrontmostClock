@@ -14,11 +14,11 @@
 	#func KillTimer "KillTimer" int,int
 
 // ライブラリ読み込み
-#include "lib.hsp"
-#include "config.hsp"
+#include "hsp/lib.hsp"
+#include "hsp/config.hsp"
 
 // バージョン情報
-#define global _title "最前面時計 version 1.10"
+#define global _title "最前面時計 version 1.20"
 
 // 画面サイズ（ここは変更しない）
 #define global clock_x	960
@@ -29,16 +29,18 @@
 #define global WM_RBUTTONDOWN	0x0204
 #define global WM_COMMAND		0x0111
 
-	// コンフィグから読み込み
-	notesel data
-	noteload "./config.cfg"
-	SetConfigData data
-		color1 = int(LoadConfig("color1","$E5004F"))
-		color2 = int(LoadConfig("color2","$FFFAFA"))
-		font_family = LoadConfig("font","マキナス")
-		window_rate = double(LoadConfig("windowRate","1"))
+// メニューの定義
+#enum global Menu_Line = -1
+#enum global Menu_Exit
+#enum global Menu_Version
+#enum global Menu_Config
+#enum global Menu_Reload
 
-	SaveConfig "./config.cfg"
+// ファイル定義
+#define global File_Config "config.txt"
+
+	// コンフィグから読み込み
+	gosub *label_load
 
 	// 調整
 	if(color1==0):color1 = 1
@@ -71,16 +73,39 @@
 		await 1000/30
 	loop
 
+// 初期化処理
+*label_load
+
+	// 読み込み
+	notesel data
+	noteload File_Config
+	SetConfigData data
+		color1 = int(LoadConfig("color1","$E5004F"))
+		color2 = int(LoadConfig("color2","$FFFAFA"))
+		font_family = LoadConfig("font","メイリオ")
+		window_rate = double(LoadConfig("windowRate","1"))
+
+	SaveConfig File_Config
+
+	return
+
 //メニュー処理
 *label_command
 
 	// メニューの処理
 	switch wparam & 0xffff
-	case 0
+	case Menu_Version
 		dialog "(C) 2020 TomSuzuki. \n " + _title,0
 		swbreak
-	case 1
+	case Menu_Exit
 		end
+		swbreak
+	case Menu_Config
+		exec File_Config,16,"open"
+		swbreak
+	case Menu_Reload
+		gosub *label_load
+		width int(window_rate*clock_x),int(window_rate*clock_y)
 		swbreak
 	swend
 	
@@ -96,8 +121,11 @@
 *label_menu
 	
 	hPopupMenu=CreatePopupMenu()
-	InsertMenu hPopupMenu,4,0x400,0,"バージョン情報(&A)"
-	InsertMenu hPopupMenu,4,0x400,1,"終了(&Q)"
+	InsertMenu hPopupMenu,4,0x400,Menu_Config,"設定ファイルを開く(&C)"
+	InsertMenu hPopupMenu,4,0x400,Menu_Reload,"設定をリロード(&R)"
+	InsertMenu hPopupMenu,4,0x400,Menu_Version,"バージョン情報(&A)"
+	InsertMenu hPopupMenu,4,0x0800,Menu_Line,""
+	InsertMenu hPopupMenu,4,0x400,Menu_Exit,"終了(&Q)"
 	TrackPopupMenu hPopupMenu,0x20,ginfo(0),ginfo(1),0,hwnd,0
 	DestroyMenu hPopupMenu
 	
